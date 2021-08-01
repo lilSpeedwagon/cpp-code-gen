@@ -14,10 +14,11 @@ class ModelItemType(Enum):
 
 class ModelItem:
     def __init__(self, name: str) -> None:
-        self.id = '' # TODO generate some rand value
+        self.id = ''  # TODO generate some rand value
         self.name = name
         self.description = ''
-    
+
+    @staticmethod
     def get_type() -> ModelItemType:
         return ModelItemType.Item
 
@@ -33,6 +34,7 @@ class ModelInt(ModelItem):
         super().__init__(name)
         self.int_type = ModelInt.IntType.Int32
 
+    @staticmethod
     def get_type() -> ModelItemType:
         return ModelItemType.Int
 
@@ -45,7 +47,8 @@ class ModelNumber(ModelItem):
     def __init__(self, name: str) -> None:
         super().__init__(name)
         self.number_type = ModelNumber.NumberType.Float
-    
+
+    @staticmethod
     def get_type() -> ModelItemType:
         return ModelItemType.Number
 
@@ -54,6 +57,7 @@ class ModelBool(ModelItem):
     def __init__(self, name: str) -> None:
         super().__init__(name)
 
+    @staticmethod
     def get_type() -> ModelItemType:
         return ModelItemType.Bool
 
@@ -66,7 +70,8 @@ class ModelString(ModelItem):
     def __init__(self, name: str) -> None:
         super().__init__(name)
         self.enum: ModelString.StringEnum = None
-    
+
+    @staticmethod
     def get_type() -> ModelItemType:
         return ModelItemType.String
 
@@ -81,6 +86,7 @@ class ModelArray(ModelItem):
         self.item_type: ModelItem = None
         self.array_type = ModelArray.ArrayType.Array
 
+    @staticmethod
     def get_type() -> ModelItemType:
         return ModelItemType.Array
 
@@ -90,7 +96,8 @@ class ModelObject(ModelItem):
         super().__init__(name)
         self.properties: List(ModelItem) = []
         self.required: List(ModelItem) = []
-        
+    
+    @staticmethod
     def get_type() -> ModelItemType:
         return ModelItemType.Object
 
@@ -98,3 +105,4 @@ class ModelObject(ModelItem):
 class Keys:
     TYPE        = 'type'
     DESCRIPTION = 'description'
+    FORMAT      = 'format'
