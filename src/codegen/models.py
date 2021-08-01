@@ -96,13 +96,13 @@ class ModelObject(ModelItem):
         super().__init__(name)
         self.properties: List(ModelItem) = []
         self.required: List(ModelItem) = []
-    
+
     @staticmethod
     def get_type() -> ModelItemType:
         return ModelItemType.Object
 
 
 class Keys:
-    TYPE        = 'type'
+    TYPE = 'type'
     DESCRIPTION = 'description'
-    FORMAT      = 'format'
+    FORMAT = 'format'

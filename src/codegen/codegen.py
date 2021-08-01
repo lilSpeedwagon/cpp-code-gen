@@ -3,7 +3,7 @@ import codegen.yaml_loader as yaml_loader
 from codegen.parser import Parser
 
 
-class CodeGenerator :
+class CodeGenerator:
     def __init__(self) -> None:
         pass
 
@@ -18,7 +18,7 @@ class CodeGenerator :
         parser = Parser()
         data_model = parser.parse(yaml_doc)
         print('done.')
-        
+
         # write resulting .h/.cpp
 
         pass

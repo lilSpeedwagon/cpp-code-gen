@@ -12,22 +12,21 @@ class Parser:
     def __init__(self) -> None:
         self.__model_items: Dict(str, ModelItem) = {}
 
-
     def parse(self, yaml_document: dict):
         definitions = self.__get_definitions_block(yaml_document)
-        
+
         for item_name in definitions:
             item_dict = definitions[item_name]
             item = Parser.__parse_item(item_name, item_dict)
             self.__add_item(item)
             Parser.__debug_print_item_info(item)
 
-
     def __add_item(self, item: ModelItem):
         if item.name in self.__model_items:
-            raise ParsingError('{} is defined more than once'.format(item.name))
+            raise ParsingError(
+                '{} is defined more than once'.format(item.name)
+            )
         self.__model_items[item.name] = item
-
 
     @staticmethod
     def __parse_item(name: str, item_dict: dict) -> ModelItem:
@@ -43,37 +42,33 @@ class Parser:
 
         return item
 
-
     @staticmethod
     def __parse_description(item_dict: dict) -> str:
         if Keys.DESCRIPTION in item_dict:
             return item_dict[Keys.DESCRIPTION]
         return None
 
-
     @staticmethod
     def __parse_int(item_dict: dict, item: ModelInt) -> None:
         if Keys.FORMAT in item_dict:
             int_type_str = item_dict[Keys.FORMAT]
             item.int_type = Parser.__parse_enum(
-                value = int_type_str,
-                enum = ModelInt.IntType,
-                enum_name = Keys.FORMAT,
-                owner_name = item.name,
+                value=int_type_str,
+                enum=ModelInt.IntType,
+                enum_name=Keys.FORMAT,
+                owner_name=item.name,
             )
-
 
     @staticmethod
     def __parse_number(item_dict: dict, item: ModelNumber) -> None:
         if Keys.FORMAT in item_dict:
             num_type_str = item_dict[Keys.FORMAT]
             item.number_type = Parser.__parse_enum(
-                value = num_type_str,
-                enum = ModelNumber.NumberType,
-                enum_name = Keys.FORMAT,
-                owner_name = item.name,
+                value=num_type_str,
+                enum=ModelNumber.NumberType,
+                enum_name=Keys.FORMAT,
+                owner_name=item.name,
             )
-            
 
     @staticmethod
     def __create_item(
@@ -94,7 +89,6 @@ class Parser:
         item_factory = types_factory_mapping[type]
         return item_factory(name)
 
-
     @staticmethod
     def __get_definitions_block(yaml_document: dict) -> dict:
         definitions_block_name = 'definitions'
@@ -105,7 +99,6 @@ class Parser:
                 )
         return yaml_document[definitions_block_name]
 
-
     @staticmethod
     def __get_item_type(item: dict, item_name: str) -> ModelItemType:
         if Keys.TYPE not in item:
@@ -113,15 +106,16 @@ class Parser:
                 'field \'type\' is required for item {}'.format(item_name)
             )
         return Parser.__parse_enum(
-            value = item[Keys.TYPE],
-            enum = ModelItemType,
-            enum_name = Keys.TYPE,
-            owner_name = item_name,
+            value=item[Keys.TYPE],
+            enum=ModelItemType,
+            enum_name=Keys.TYPE,
+            owner_name=item_name,
         )
 
-
     @staticmethod
-    def __parse_enum(value: str, enum, enum_name: str, owner_name: str = '') -> Enum:
+    def __parse_enum(
+        value: str, enum, enum_name: str, owner_name: str = ''
+    ) -> Enum:
         for enum_item in enum:
             if value == enum_item.value:
                 return enum_item
@@ -132,7 +126,6 @@ class Parser:
             ) if owner_name else
             '{} has invalid value \'{}\'}'.format(enum_name, value)
         )
-
 
     @staticmethod
     def __debug_print_item_info(item: ModelItem):
