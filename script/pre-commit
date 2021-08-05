@@ -11,6 +11,7 @@ import sys
 import subprocess
 
 
+# colorize output
 COLOR = {
     'red': '\033[1;31m',
     'green': '\033[1;32m',
