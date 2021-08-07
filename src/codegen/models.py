@@ -8,6 +8,7 @@ class Keys:
     TYPE = 'type'
     DESCRIPTION = 'description'
     FORMAT = 'format'
+    ENUM = 'enum'
 
 
 class ModelItemType(Enum):
@@ -107,7 +108,18 @@ class ModelString(ModelItem):
 
     def parse(self, item_dict: dict) -> None:
         super().parse(item_dict)
-        # TODO parse string enum
+        if Keys.ENUM in item_dict:
+            self.__parse_enum(item_dict[Keys.ENUM])
+
+    def __parse_enum(self, enum_list: list) -> None:
+        error_msg = """invalid enum in {},
+         must be a list of strings""".format(self.name)
+        if not isinstance(enum_list, list):
+            raise utils.ParsingError(error_msg)
+        for enum_item in enum_list:
+            if not isinstance(enum_item, str):
+                raise utils.ParsingError(error_msg)
+        self.enum = ModelString.StringEnum(enum_list)
 
     @staticmethod
     def get_type() -> ModelItemType:
