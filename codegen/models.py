@@ -22,14 +22,32 @@ class ModelItemType(Enum):
 
 
 class ModelItem:
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, allowed_fields: list = []) -> None:
         self.id = ''  # TODO generate some rand value
-        self.name = name
-        self.description = ''
+        self.name: str = name
+        self.description: str = ''
+        self.__allowed_fields: List[str] = allowed_fields + [
+            Keys.TYPE, Keys.DESCRIPTION
+        ]
 
     def parse(self, item_dict: dict) -> None:
+        self.__check_allowed_fields(item_dict)
         if Keys.DESCRIPTION in item_dict:
-            self.description = item_dict[Keys.DESCRIPTION]
+            description = item_dict[Keys.DESCRIPTION]
+            if not isinstance(description, str):
+                raise utils.ParsingError(
+                    '{} description must be a string'.format(self.name)
+                )
+            self.description = description
+
+    def __check_allowed_fields(self, item_dict: dict) -> None:
+        for item in item_dict:
+            if item not in self.__allowed_fields:
+                raise utils.ParsingError(
+                    '{} has unknown field \'{}\''.format(
+                        self.name, item
+                    )
+                )
 
     @staticmethod
     def get_type() -> ModelItemType:
@@ -44,7 +62,7 @@ class ModelInt(ModelItem):
         Int64 = 'int64'
 
     def __init__(self, name: str) -> None:
-        super().__init__(name)
+        super().__init__(name, allowed_fields=[Keys.FORMAT])
         self.int_type = ModelInt.IntType.Int32
 
     def parse(self, item_dict: dict) -> None:
@@ -69,7 +87,7 @@ class ModelNumber(ModelItem):
         Double = 'double'
 
     def __init__(self, name: str) -> None:
-        super().__init__(name)
+        super().__init__(name, allowed_fields=[Keys.FORMAT])
         self.number_type = ModelNumber.NumberType.Float
 
     def parse(self, item_dict: dict) -> None:
@@ -103,7 +121,7 @@ class ModelString(ModelItem):
             self.enum_list = enum_list
 
     def __init__(self, name: str) -> None:
-        super().__init__(name)
+        super().__init__(name, allowed_fields=[Keys.ENUM])
         self.enum: ModelString.StringEnum = None
 
     def parse(self, item_dict: dict) -> None:
@@ -112,6 +130,11 @@ class ModelString(ModelItem):
             self.__parse_enum(item_dict[Keys.ENUM])
 
     def __parse_enum(self, enum_list: list) -> None:
+        if not enum_list:
+            raise utils.ParsingError(
+                'empty enum in item {}'.format(self.name)
+            )
+
         error_msg = """invalid enum in {},
          must be a list of strings""".format(self.name)
         if not isinstance(enum_list, list):
