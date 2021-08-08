@@ -1,11 +1,4 @@
 #!/usr/bin/python
-
-"""
-USAGE:
-put this file to .git/hooks/ to enable pre-commit linter checks
-'pycodestyle' command is used for linting
-"""
-
 from os import error
 import sys
 import subprocess
@@ -35,7 +28,13 @@ def get_changed_files():
     files = []
     filelist = system('git', 'diff', '--cached', '--name-status').strip()
     for line in filelist.decode("utf-8").split('\n'):
-        action, filename = line.strip().split('\t')
+        """
+        M/A <filename> - for modified items
+        R<num> <from filename> <to filename> - for moved items
+        """
+        line_items = line.strip().split('\t')
+        action = line_items[0]
+        filename = line_items[-1]
         if filename.endswith('.py') and action != 'D':
             files.append(filename)
     return files
