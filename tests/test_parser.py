@@ -40,9 +40,12 @@ def test_parse_item(
     assert item.name == name
     try:
         item.parse(item_dict)
-        assert expected_description == item.description
+        assert not is_err_expected
     except ParsingError as e:
         assert is_err_expected, 'unexpected exception: {}'.format(e)
+    
+    if expected_description:
+        assert expected_description == item.description
 
 
 @pytest.mark.parametrize(
@@ -86,9 +89,12 @@ def test_parse_int(
     assert item.name == name
     try:
         item.parse(item_dict)
-        assert expected_type == item.int_type
+        assert not is_err_expected
     except ParsingError as e:
         assert is_err_expected, 'unexpected exception: {}'.format(e)
+
+    if expected_type:
+        assert expected_type == item.int_type
 
 
 @pytest.mark.parametrize(
@@ -127,14 +133,17 @@ def test_parse_number(
     expected_type: models.ModelNumber.NumberType,
     is_err_expected: bool,
 ):
-    name = 'Integer'
+    name = 'Number'
     item = models.ModelNumber(name)
     assert item.name == name
     try:
         item.parse(item_dict)
-        assert expected_type == item.number_type
+        assert not is_err_expected
     except ParsingError as e:
         assert is_err_expected, 'unexpected exception: {}'.format(e)
+
+    if expected_type:
+        assert expected_type == item.number_type
 
 
 @pytest.mark.parametrize(
@@ -188,8 +197,85 @@ def test_parse_string(
     assert item.name == name
     try:
         item.parse(item_dict)
+        assert not is_err_expected
     except ParsingError as e:
         assert is_err_expected, 'unexpected exception: {}'.format(e)
 
     if expected_enum:
         assert expected_enum == item.enum.enum_list
+
+
+@pytest.mark.parametrize(
+    "item_dict,exp_type,exp_items,exp_ref,is_err_exp",
+    [
+        (
+            {},
+            None,
+            None,
+            None,
+            True,
+        ),
+        (
+            {'items': '#ItemRef'},
+            models.ModelArray.ArrayType.Array,
+            None,
+            'ItemRef',
+            False,
+        ),
+        (
+            {'items': 'ItemRef'},
+            None,
+            None,
+            None,
+            True,
+        ),
+        (
+            {'items': {'type': 'int'}},
+            models.ModelArray.ArrayType.Array,
+            models.ModelInt('ArrayItems'),
+            None,
+            False,
+        ),
+        (
+            {'items': '#ItemRef', 'array_type': 'set'},
+            models.ModelArray.ArrayType.Set,
+            None,
+            'ItemRef',
+            False,
+        ),
+        (
+            {'items': '#ItemRef', 'extra_field': 'value'},
+            None,
+            None,
+            None,
+            True,
+        ),
+    ],
+    ids=[
+        'empty', 'ref', 'bad ref', 'int items', 'set', 'extra'
+    ]
+)
+def test_parse_array(
+    item_dict: dict,
+    exp_type: models.ModelArray.ArrayType,
+    exp_items: models.ModelItem,
+    exp_ref: str,
+    is_err_exp: bool,
+):
+    name = 'Array'
+    item = models.ModelArray(name)
+    assert item.name == name
+    try:
+        item.parse(item_dict)
+        assert not is_err_exp
+    except ParsingError as e:
+        assert is_err_exp, 'unexpected exception: {}'.format(e)
+
+    if exp_type:
+        assert exp_type == item.array_type
+
+    if exp_items:
+        assert exp_items.__dict__ == item.items_type.__dict__
+
+    if exp_ref:
+        assert exp_ref == item.items_reference

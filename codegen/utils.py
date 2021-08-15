@@ -1,9 +1,13 @@
 from enum import Enum
 
 
+REFERENCE_PREFIX = '#'
+
+
 class ParsingError(RuntimeError):
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
+    def __init__(self, msg: str, context: str = '') -> None:
+        msg = '{}: {}'.format(context, msg) if context else msg
+        super().__init__(msg)
 
 
 def parse_enum(
@@ -14,8 +18,15 @@ def parse_enum(
             return enum_item
 
     raise ParsingError(
-        'field {} of item {} has invalid value \'{}\''.format(
-            enum_name, owner_name, value
-        ) if owner_name else
-        '{} has invalid value \'{}\'}'.format(enum_name, value)
+        msg='field {} has invalid value \'{}\''.format(
+            enum_name, value
+        ),
+        context=owner_name,
     )
+
+def is_reference(ref) -> bool:
+    return isinstance(ref, str) and ref.startswith(REFERENCE_PREFIX)
+
+def get_referenced_item_name(ref: str) -> str:
+    return ref.removeprefix(REFERENCE_PREFIX)
+        

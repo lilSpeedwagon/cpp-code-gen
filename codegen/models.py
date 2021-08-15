@@ -9,6 +9,8 @@ class Keys:
     DESCRIPTION = 'description'
     FORMAT = 'format'
     ENUM = 'enum'
+    ARR_TYPE = 'array_type'
+    ITEMS = 'items'
 
 
 class ModelItemType(Enum):
@@ -19,6 +21,19 @@ class ModelItemType(Enum):
     String = 'string'
     Array = 'array'
     Object = 'object'
+
+
+def get_item_type(item: dict, item_name: str) -> ModelItemType:
+        if Keys.TYPE not in item:
+            raise utils.ParsingError(
+                'field \'type\' is required for item {}'.format(item_name)
+            )
+        return utils.parse_enum(
+            value=item[Keys.TYPE],
+            enum=ModelItemType,
+            enum_name=Keys.TYPE,
+            owner_name=item_name,
+        )
 
 
 class ModelItem:
@@ -36,7 +51,8 @@ class ModelItem:
             description = item_dict[Keys.DESCRIPTION]
             if not isinstance(description, str):
                 raise utils.ParsingError(
-                    '{} description must be a string'.format(self.name)
+                    msg='description must be a string',
+                    context=self.name,
                 )
             self.description = description
 
@@ -44,9 +60,8 @@ class ModelItem:
         for item in item_dict:
             if item not in self.__allowed_fields:
                 raise utils.ParsingError(
-                    '{} has unknown field \'{}\''.format(
-                        self.name, item
-                    )
+                    msg='unknown field \'{}\''.format(item),
+                    context=self.name,
                 )
 
     @staticmethod
@@ -132,16 +147,19 @@ class ModelString(ModelItem):
     def __parse_enum(self, enum_list: list) -> None:
         if not enum_list:
             raise utils.ParsingError(
-                'empty enum in item {}'.format(self.name)
+                msg='empty enum',
+                context=self.name,
             )
 
-        error_msg = """invalid enum in {},
-         must be a list of strings""".format(self.name)
+        exception = utils.ParsingError(
+            msg='enum must be a list of strings',
+            context=self.name,
+        )
         if not isinstance(enum_list, list):
-            raise utils.ParsingError(error_msg)
+            raise exception
         for enum_item in enum_list:
             if not isinstance(enum_item, str):
-                raise utils.ParsingError(error_msg)
+                raise exception
         self.enum = ModelString.StringEnum(enum_list)
 
     @staticmethod
@@ -155,13 +173,50 @@ class ModelArray(ModelItem):
         Set = 'set'
 
     def __init__(self, name: str) -> None:
-        super().__init__(name)
-        self.item_type: ModelItem = None
+        super().__init__(name, allowed_fields=[
+            Keys.ARR_TYPE,
+            Keys.ITEMS,
+        ])
         self.array_type = ModelArray.ArrayType.Array
+        self.items_reference = None
+        self.items_type = None
 
     def parse(self, item_dict: dict) -> None:
         super().parse(item_dict)
-        # TODO parse arr type
+        self.__parse_items(item_dict)
+        if Keys.ARR_TYPE in item_dict:
+            arr_type_str = item_dict[Keys.ARR_TYPE]
+            self.array_type = utils.parse_enum(
+                value=arr_type_str,
+                enum=ModelArray.ArrayType,
+                enum_name=Keys.ARR_TYPE,
+                owner_name=self.name,
+            )
+
+    def __parse_items(self, item_dict: dict) -> None:
+        if Keys.ITEMS not in item_dict or not item_dict[Keys.ITEMS]:
+            raise utils.ParsingError(
+                msg='array requires field {}'.format(Keys.ITEMS),
+                context=self.name,
+            )
+
+        items_field = item_dict[Keys.ITEMS]
+        is_reference = utils.is_reference(items_field)
+        if not is_reference and not isinstance(items_field, dict):
+            raise utils.ParsingError(
+                msg='{} must be an object or a reference'.format(Keys.ITEMS),
+                context=self.name,
+            )
+
+        if is_reference:
+            self.items_reference = utils.get_referenced_item_name(items_field)
+        else:
+            name = '{}Items'.format(self.name)
+            type = get_item_type(item=items_field, item_name=self.name)
+            item = create_item(name, type)
+            item.parse(items_field)
+            self.items_type = item
+
 
     @staticmethod
     def get_type() -> ModelItemType:
@@ -181,3 +236,22 @@ class ModelObject(ModelItem):
     @staticmethod
     def get_type() -> ModelItemType:
         return ModelItemType.Object
+
+
+def create_item(
+        name: str, type: ModelItemType
+    ) -> ModelItem:
+        types_factory_mapping = {
+            ModelInt.get_type():     ModelInt,
+            ModelNumber.get_type():  ModelNumber,
+            ModelBool.get_type():    ModelBool,
+            ModelString.get_type():  ModelString,
+            ModelArray.get_type():   ModelArray,
+            ModelObject.get_type():  ModelObject,
+        }
+
+        if type not in types_factory_mapping:
+            raise RuntimeError('unknown type object {}'.format(type))
+
+        item_factory = types_factory_mapping[type]
+        return item_factory(name)
