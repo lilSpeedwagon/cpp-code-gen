@@ -1,7 +1,7 @@
 from yaml.scanner import ScannerError
 
 import codegen.yaml_loader as yaml_loader
-from codegen.parser import Parser
+from codegen.parser.parser import Parser
 
 
 class CodeGenerator:

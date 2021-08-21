@@ -1,7 +1,7 @@
 import pytest
 
-from codegen.utils import ParsingError
-import codegen.models as models
+from codegen.parser.utils import ParsingError
+import codegen.parser.models as models
 
 
 def get_item_ref(item: dict, ref: str):

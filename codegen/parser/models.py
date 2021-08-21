@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List
 
-import codegen.utils as utils
+import codegen.parser.utils as utils
 
 
 class Keys:
@@ -282,7 +282,9 @@ class ModelObject(ModelItem):
         if not required_list:
             return
 
-        error_msg = '\'{}\' must be a list of property names'.format(Keys.REQUIRED)
+        error_msg = '\'{}\' must be a list of property names'.format(
+            Keys.REQUIRED
+        )
         if not isinstance(required_list, list):
             raise utils.ParsingError(msg=error_msg, context=self.name)
 

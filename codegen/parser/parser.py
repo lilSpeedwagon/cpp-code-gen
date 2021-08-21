@@ -1,7 +1,7 @@
 from typing import Dict
 
-import codegen.utils as utils
-from codegen.models import *
+import codegen.parser.utils as utils
+from codegen.parser.models import *
 
 
 class Parser:
