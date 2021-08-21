@@ -4,6 +4,15 @@ from codegen.utils import ParsingError
 import codegen.models as models
 
 
+def get_item_ref(item: dict, ref: str):
+    result = models.ItemRef()
+    if item:
+        result.set_item(item)
+    elif ref:
+        result.set_ref(ref)
+    return result
+
+
 @pytest.mark.parametrize(
     "item_dict,expected_description,is_err_expected",
     [
@@ -43,7 +52,7 @@ def test_parse_item(
         assert not is_err_expected
     except ParsingError as e:
         assert is_err_expected, 'unexpected exception: {}'.format(e)
-    
+
     if expected_description:
         assert expected_description == item.description
 
@@ -275,7 +284,133 @@ def test_parse_array(
         assert exp_type == item.array_type
 
     if exp_items:
-        assert exp_items.__dict__ == item.items_type.__dict__
+        assert item.items_type.is_item()
+        assert not item.items_type.is_ref()
+        assert exp_items.__dict__ == item.items_type.get_item().__dict__
 
     if exp_ref:
-        assert exp_ref == item.items_reference
+        assert not item.items_type.is_item()
+        assert item.items_type.is_ref()
+        assert exp_ref == item.items_type.get_ref()
+
+
+@pytest.mark.parametrize(
+    "item_dict,exp_properties,exp_required,is_err_exp",
+    [
+        (
+            {},
+            {},
+            [],
+            True,
+        ),
+        (
+            {'properties': {}},
+            {},
+            [],
+            True,
+        ),
+        (
+            {
+                'properties': {'key': 'value'},
+            },
+            {},
+            [],
+            True,
+        ),
+        (
+            {
+                'properties': {'key': 'value'},
+                'required': [],
+            },
+            {},
+            [],
+            True,
+        ),
+        (
+            {
+                'properties': {'key': '#value'},
+                'required': [],
+            },
+            {
+                'key': get_item_ref(None, 'value')
+            },
+            [],
+            False,
+        ),
+        (
+            {
+                'properties': {'int_type': {'type': 'int'}},
+                'required': [],
+            },
+            {
+                'int_type': get_item_ref(
+                    models.ModelInt('ObjectItems'),
+                    None,
+                )
+            },
+            [],
+            False,
+        ),
+        (
+            {
+                'properties': {'int_type': {'type': 'int'}},
+                'required': ['extra'],
+            },
+            {
+                'int_type': get_item_ref(
+                    models.ModelInt('ObjectItems'),
+                    None,
+                )
+            },
+            [],
+            True,
+        ),
+        (
+            {
+                'properties': {'int_type': {'type': 'int'}},
+                'required': ['int_type'],
+            },
+            {
+                'int_type': get_item_ref(
+                    models.ModelInt('ObjectItems'),
+                    None,
+                )
+            },
+            ['int_type'],
+            False,
+        ),
+    ],
+    ids=[
+        'no props', 'empty props', 'no req', 'bad ref', 'with ref',
+        'with object', 'missing required', 'with required'
+    ]
+)
+def test_parse_object(
+    item_dict: dict,
+    exp_properties: list,
+    exp_required: list,
+    is_err_exp: bool,
+):
+    name = 'Object'
+    item = models.ModelObject(name)
+    assert item.name == name
+    try:
+        item.parse(item_dict)
+        assert not is_err_exp
+    except ParsingError as e:
+        assert is_err_exp, 'unexpected exception: {}'.format(e)
+
+    assert len(exp_properties) == len(item.properties)
+    for key, value in exp_properties.items():
+        assert key in item.properties
+        prop = item.properties[key]
+        if value.is_ref():
+            assert prop.is_ref()
+            assert prop.get_ref() == value.get_ref()
+        else:
+            assert prop.is_item()
+            assert prop.get_item().__dict__ == value.get_item().__dict__
+
+    assert len(exp_required) == len(item.required)
+    for i in range(len(exp_required)):
+        exp_required[i] == item.required[i]

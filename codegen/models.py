@@ -11,6 +11,8 @@ class Keys:
     ENUM = 'enum'
     ARR_TYPE = 'array_type'
     ITEMS = 'items'
+    PROPERTIES = 'properties'
+    REQUIRED = 'required'
 
 
 class ModelItemType(Enum):
@@ -24,16 +26,16 @@ class ModelItemType(Enum):
 
 
 def get_item_type(item: dict, item_name: str) -> ModelItemType:
-        if Keys.TYPE not in item:
-            raise utils.ParsingError(
-                'field \'type\' is required for item {}'.format(item_name)
-            )
-        return utils.parse_enum(
-            value=item[Keys.TYPE],
-            enum=ModelItemType,
-            enum_name=Keys.TYPE,
-            owner_name=item_name,
+    if Keys.TYPE not in item:
+        raise utils.ParsingError(
+            'field \'type\' is required for item {}'.format(item_name)
         )
+    return utils.parse_enum(
+        value=item[Keys.TYPE],
+        enum=ModelItemType,
+        enum_name=Keys.TYPE,
+        owner_name=item_name,
+    )
 
 
 class ModelItem:
@@ -67,6 +69,37 @@ class ModelItem:
     @staticmethod
     def get_type() -> ModelItemType:
         return ModelItemType.Item
+
+
+class ItemRef:
+    """
+    ItemRef may be a nested ModelItem or
+    a reference to other type
+    """
+
+    def __init__(self) -> None:
+        self.__ref: str = None
+        self.__item: ModelItem = None
+
+    def set_ref(self, ref: str) -> None:
+        self.__ref = ref
+        self.__item = None
+
+    def set_item(self, item: ModelItem) -> None:
+        self.__item = item
+        self.__ref = None
+
+    def get_item(self) -> ModelItem:
+        return self.__item
+
+    def get_ref(self) -> str:
+        return self.__ref
+
+    def is_ref(self) -> bool:
+        return self.__ref is not None
+
+    def is_item(self) -> bool:
+        return self.__item is not None
 
 
 class ModelInt(ModelItem):
@@ -178,8 +211,7 @@ class ModelArray(ModelItem):
             Keys.ITEMS,
         ])
         self.array_type = ModelArray.ArrayType.Array
-        self.items_reference = None
-        self.items_type = None
+        self.items_type: ItemRef = None
 
     def parse(self, item_dict: dict) -> None:
         super().parse(item_dict)
@@ -201,22 +233,7 @@ class ModelArray(ModelItem):
             )
 
         items_field = item_dict[Keys.ITEMS]
-        is_reference = utils.is_reference(items_field)
-        if not is_reference and not isinstance(items_field, dict):
-            raise utils.ParsingError(
-                msg='{} must be an object or a reference'.format(Keys.ITEMS),
-                context=self.name,
-            )
-
-        if is_reference:
-            self.items_reference = utils.get_referenced_item_name(items_field)
-        else:
-            name = '{}Items'.format(self.name)
-            type = get_item_type(item=items_field, item_name=self.name)
-            item = create_item(name, type)
-            item.parse(items_field)
-            self.items_type = item
-
+        self.items_type = parse_ref_or_nested_item(items_field, self.name)
 
     @staticmethod
     def get_type() -> ModelItemType:
@@ -225,13 +242,54 @@ class ModelArray(ModelItem):
 
 class ModelObject(ModelItem):
     def __init__(self, name: str) -> None:
-        super().__init__(name)
-        self.properties: List(ModelItem) = []
-        self.required: List(ModelItem) = []
+        super().__init__(
+            name=name,
+            allowed_fields=[
+                Keys.PROPERTIES,
+                Keys.REQUIRED,
+            ],
+        )
+        self.properties: List(ItemRef) = {}
+        self.required: List(str) = []
 
     def parse(self, item_dict: dict) -> None:
         super().parse(item_dict)
-        # TODO parse object properties
+        self.__parse_properties(item_dict)
+        self.__parse_required(item_dict)
+
+    def __parse_properties(self, item_dict: dict) -> None:
+        if Keys.PROPERTIES not in item_dict:
+            raise utils.ParsingError(
+                msg='field \'{}\' is required'.format(Keys.PROPERTIES),
+                context=self.name,
+            )
+
+        props_field = item_dict[Keys.PROPERTIES]
+        if not props_field or not isinstance(props_field, dict):
+            raise utils.ParsingError(
+                msg='{} must be a dictionary'.format(Keys.PROPERTIES),
+                context=self.name,
+            )
+
+        for name, property in props_field.items():
+            ref = parse_ref_or_nested_item(property, self.name)
+            self.properties[name] = ref
+
+    def __parse_required(self, item_dict: dict) -> None:
+        if Keys.REQUIRED not in item_dict:
+            return
+        required_list = item_dict[Keys.REQUIRED]
+        if not required_list:
+            return
+
+        error_msg = '\'{}\' must be a list of property names'.format(Keys.REQUIRED)
+        if not isinstance(required_list, list):
+            raise utils.ParsingError(msg=error_msg, context=self.name)
+
+        for item in required_list:
+            if not isinstance(item, str) or item not in self.properties.keys():
+                raise utils.ParsingError(msg=error_msg, context=self.name)
+            self.required.append(item)
 
     @staticmethod
     def get_type() -> ModelItemType:
@@ -240,18 +298,47 @@ class ModelObject(ModelItem):
 
 def create_item(
         name: str, type: ModelItemType
-    ) -> ModelItem:
-        types_factory_mapping = {
-            ModelInt.get_type():     ModelInt,
-            ModelNumber.get_type():  ModelNumber,
-            ModelBool.get_type():    ModelBool,
-            ModelString.get_type():  ModelString,
-            ModelArray.get_type():   ModelArray,
-            ModelObject.get_type():  ModelObject,
-        }
+) -> ModelItem:
+    types_factory_mapping = {
+        ModelInt.get_type():     ModelInt,
+        ModelNumber.get_type():  ModelNumber,
+        ModelBool.get_type():    ModelBool,
+        ModelString.get_type():  ModelString,
+        ModelArray.get_type():   ModelArray,
+        ModelObject.get_type():  ModelObject,
+    }
 
-        if type not in types_factory_mapping:
-            raise RuntimeError('unknown type object {}'.format(type))
+    if type not in types_factory_mapping:
+        raise RuntimeError('unknown type object {}'.format(type))
 
-        item_factory = types_factory_mapping[type]
-        return item_factory(name)
+    item_factory = types_factory_mapping[type]
+    return item_factory(name)
+
+
+def parse_ref_or_nested_item(field, parent_name: str) -> ItemRef:
+    """
+    Checks whether the specified field of the object is a reference
+    or a nested object and raises an error if it is something else.
+    """
+
+    is_reference = utils.is_reference(field)
+    if not is_reference and not isinstance(field, dict):
+        raise utils.ParsingError(
+            msg='{} must be an object or a reference, got {}'.format(
+                Keys.ITEMS,
+                field,
+            ),
+            context=parent_name,
+        )
+
+    result = ItemRef()
+    if is_reference:
+        result.set_ref(utils.get_referenced_item_name(field))
+    else:
+        name = '{}Items'.format(parent_name)
+        type = get_item_type(item=field, item_name=name)
+        item = create_item(name, type)
+        item.parse(field)
+        result.set_item(item)
+
+    return result

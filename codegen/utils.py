@@ -24,9 +24,10 @@ def parse_enum(
         context=owner_name,
     )
 
+
 def is_reference(ref) -> bool:
     return isinstance(ref, str) and ref.startswith(REFERENCE_PREFIX)
 
+
 def get_referenced_item_name(ref: str) -> str:
     return ref.removeprefix(REFERENCE_PREFIX)
-        
